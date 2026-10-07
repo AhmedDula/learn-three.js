@@ -2,25 +2,34 @@
 import gsap from "gsap";
 import { useRef, useEffect } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/Addons.js";
+import { OrbitControls, plane } from "three/examples/jsm/Addons.js";
 export default function ThreeScene() {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xffffff);
   const containerRef = useRef();
   useEffect(() => {
+    const scene = new THREE.Scene();
+    // scene.background = new THREE.Color(0xffffff);
     const container = containerRef.current;
     if (!container) return;
+
+    // Renderer
     const renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
+    // -----------
+    // Camera
     const camera = new THREE.PerspectiveCamera(
       75,
-      window.innerWidth / window.innerHeight,
+      container.clientWidth / container.clientHeight,
       0.1,
       100,
     );
+    camera.position.set(0,4,10);
+
+    // -----------
+    // Resize
     function resizeRendererToDisplaySize() {
       const width = container.clientWidth;
       const height = container.clientHeight;
@@ -32,36 +41,128 @@ export default function ThreeScene() {
       }
       return needResize;
     }
-    camera.position.z = 5;
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: "blue" });
+    // -----------
+
+    // Loading Manager
+    const loadingManager = new THREE.LoadingManager();
+
+    // gsap
+    loadingManager.onProgress = (i, loaded, total) => {
+      console.log(loaded, total);
+      gsap.to(".progress", {
+        width: `${(loaded / total) * 100}%`,
+        duration: 0.3,
+        ease: "none",
+        overwrite: true,
+      });
+    };
+    loadingManager.onLoad = (i, loaded, total) => {
+      console.log("loaded");
+      
+      gsap.to(".loader", {
+        autoAlpha:0,
+        duration: 1.2,
+        ease: "none",
+        overwrite: true,
+      });
+    };
+    //
+    // ----------
+    // Loader
+    const TextureLoader = new THREE.TextureLoader(loadingManager);
+    const disp = TextureLoader.load(
+      "texture/river/dry_river_pebbles_disp_4k.jpg",
+    );
+    const ao = TextureLoader.load("texture/river/dry_river_pebbles_ao_4k.jpg");
+    const diff = TextureLoader.load(
+      "texture/river/dry_river_pebbles_diff_4k.jpg",
+    );
+    const normal = TextureLoader.load(
+      "texture/river/dry_river_pebbles_nor_gl_4k.jpg",
+    );
+    const rough = TextureLoader.load(
+      "texture/river/dry_river_pebbles_rough_4k.jpg",
+    );
+    diff.colorSpace = THREE.SRGBColorSpace;
+    // Material
+    const material = new THREE.MeshPhysicalMaterial({
+      map: diff,
+      normalMap: normal,
+      roughnessMap: rough,
+      aoMap: ao,
+      displacementMap: disp,
+      displacementScale: 0.04,
+    });
+    // -----------
+
+    // Shapes
+    const geometrySphere = new THREE.SphereGeometry(1, 32, 32);
+    const sphere = new THREE.Mesh(geometrySphere, material);
+    sphere.position.x = 2;
+
+    const geometry = new THREE.BoxGeometry(1, 1, 1, 32, 32, 32);
     const cube = new THREE.Mesh(geometry, material);
-    const geometryPlane = new THREE.BoxGeometry(2,2,0.2)
-    const materialPlane= new THREE.MeshNormalMaterial({color:"red"})
-    const Plane = new THREE.Mesh(geometryPlane,materialPlane)
-    Plane.position.set(0,0,.1)
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(-4, -5, 2);
-scene.add(Plane)
-scene.add(cube);
 
-scene.add(light);
+    const geometryWall = new THREE.BoxGeometry(2, 2, 0.2, 64, 64, 10);
+    const wall = new THREE.Mesh(geometryWall, material);
+    const geometryPlane = new THREE.BoxGeometry(10, 0.2, 10, 64, 64, 10);
+    const plane = new THREE.Mesh(geometryPlane, material);
+    plane.position.y = -1.2;
+    // -----------
+    // Lights
+    const light = new THREE.DirectionalLight(0xffffff, 3);
+    light.position.set(0, 1, 1);
+    // -----------
 
-const controls = new OrbitControls(camera,renderer.domElement)
-controls.autoRotate = true
-controls.autoRotateSpeed =5
+    scene.add(sphere,cube,wall,plane);
+    
+    scene.add(light);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    // controls.autoRotate = true
+    controls.autoRotateSpeed = 5;
+
+    // frame Requiest
+    let animationId;
     function animate() {
-      requestAnimationFrame(animate);
+      animationId = requestAnimationFrame(animate);
+
       if (resizeRendererToDisplaySize()) {
         camera.aspect = container.clientWidth / container.clientHeight;
+
         camera.updateProjectionMatrix();
       }
+
+      controls.update();
       renderer.render(scene, camera);
-      controls.update()
     }
-    
+
     animate();
-    return () => container.removeChild(renderer.domElement);
+    return () => {
+      cancelAnimationFrame(animationId);
+
+      controls.dispose();
+      renderer.dispose();
+
+      geometrySphere.dispose();
+      geometry.dispose();
+      geometryPlane.dispose();
+
+      material.dispose();
+
+      container.removeChild(renderer.domElement);
+    };
   }, []);
-  return <div className="w-screen h-screen" ref={containerRef}></div>;
+  return (
+    <main className="w-screen overflow-hidden">
+      <div className="loader w-full h-screen fixed  inset-0 bg-amber-100">
+        {" "}
+        <div className="mx-auto my-[30%] w-fit h-fit">
+          <p className=" w-fit h-fit "> Loading...</p>
+          <span className="progress block h-2 w-0 bg-amber-800 rounded-2xl"></span>
+        </div>
+      </div>
+      <div className="w-screen h-screen  " ref={containerRef} />
+    </main>
+  );
 }
