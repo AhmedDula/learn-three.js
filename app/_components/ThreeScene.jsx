@@ -18,6 +18,7 @@ export default function ThreeScene() {
     container.appendChild(renderer.domElement);
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
+    renderer.shadowMap.enabled = true
     // -----------
     // Camera
     const camera = new THREE.PerspectiveCamera(
@@ -102,24 +103,54 @@ export default function ThreeScene() {
 
     const geometry = new THREE.BoxGeometry(1, 1, 1, 32, 32, 32);
     const cube = new THREE.Mesh(geometry, material);
-
+cube.castShadow =true
     const geometryWall = new THREE.BoxGeometry(2, 2, 0.2, 64, 64, 10);
     const wall = new THREE.Mesh(geometryWall, material);
+    wall.position.set(-3,0,0)
     const geometryPlane = new THREE.BoxGeometry(10, 0.2, 10, 64, 64, 10);
     const plane = new THREE.Mesh(geometryPlane, material);
     plane.position.y = -1.2;
+    plane.receiveShadow =true
     // -----------
     // Lights
-    const light = new THREE.DirectionalLight(0xffffff, 3);
-    light.position.set(0, 1, 1);
+    // --- spotlight ----
+    const spotLight = new THREE.SpotLight(0xfffff0,700,20,Math.PI / 5,10 )
+    spotLight.position.set(0,8,-5)
+   
+    spotLight.castShadow = true
+    spotLight.shadow.camera.far=20
+    const helper = new THREE.SpotLightHelper(spotLight)
+    const helperCM = new THREE.CameraHelper( spotLight.shadow.camera );
+    scene.add(helper,helperCM)
+
+
+    // ---- directionalLight ----
+    // const directlight = new THREE.DirectionalLight(0xffffff, 10);
+    // directlight.position.set(2, 7, 2);
+
+   // ambiant light
+  //  const ambiantLight = new THREE.AmbientLight(0xfffff0,50)
+  
+  // pointLight 
+  // const pointLight = new THREE.PointLight(0xfffff0,10,5)
+  // pointLight.position.set(0,2,0)
+
+  // HemisphereLight
+  //  const hemiLight  = new THREE.HemisphereLight(0xffff00 , 0xff00ff,10)
+
+  // rectArea Light
+  // const rectLight = new THREE.RectAreaLight( 0xffffff,10,10,30)
+  // rectLight.position.set(0,10,10)
+  // rectLight.lookAt(cube.position)
+
     // -----------
 
+    scene.add(spotLight);
     scene.add(sphere,cube,wall,plane);
     
-    scene.add(light);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    // controls.autoRotate = true
+   
     controls.autoRotateSpeed = 5;
 
     // frame Requiest
